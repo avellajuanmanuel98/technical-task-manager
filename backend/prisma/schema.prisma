@@ -24,6 +24,11 @@ enum TaskStatus {
   CANCELADA
 }
 
+enum TaskSource {
+  MANUAL
+  IMPORT
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -95,9 +100,16 @@ model Task {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Trazabilidad de origen del registro (creado a mano vs. importado de Excel).
+  source     TaskSource @default(MANUAL)
+  // Identificador del registro en el Excel original, si lo tenía (ej. "Tarea #4859").
+  // Se usa además como señal fuerte de duplicado al reimportar el mismo archivo.
+  externalRef String?
+
   @@index([technicianId])
   @@index([status])
   @@index([laborTypeId])
   @@index([scheduledDate])
+  @@index([externalRef])
   @@map("tasks")
 }

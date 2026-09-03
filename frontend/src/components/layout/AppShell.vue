@@ -16,6 +16,7 @@ const adminNav = [
   { to: '/tasks', label: 'Tareas', icon: '📋' },
   { to: '/admin/technicians', label: 'Técnicos', icon: '👤' },
   { to: '/admin/labor-types', label: 'Tipos de labor', icon: '🏷️' },
+  { to: '/admin/import', label: 'Importar Excel', icon: '📥' },
 ]
 
 const tecnicoNav = [{ to: '/my-tasks', label: 'Mis tareas', icon: '✅' }]

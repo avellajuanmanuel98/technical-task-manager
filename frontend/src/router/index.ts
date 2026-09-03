@@ -48,6 +48,12 @@ const router = createRouter({
       meta: { roles: ['ADMIN'] },
     },
     {
+      path: '/admin/import',
+      name: 'import',
+      component: () => import('../views/admin/ImportView.vue'),
+      meta: { roles: ['ADMIN'] },
+    },
+    {
       path: '/admin/technicians',
       name: 'technicians',
       component: () => import('../views/admin/TechniciansView.vue'),

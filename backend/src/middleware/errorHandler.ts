@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { MulterError } from 'multer';
 import { Prisma } from '@prisma/client';
 import { AppError } from '../lib/errors';
 
@@ -9,6 +10,12 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     res.status(err.statusCode).json({
       error: { code: err.code, message: err.message, details: (err as { details?: unknown }).details },
     });
+    return;
+  }
+
+  if (err instanceof MulterError) {
+    const message = err.code === 'LIMIT_FILE_SIZE' ? 'El archivo supera el tamaño máximo permitido (10MB)' : err.message;
+    res.status(400).json({ error: { code: 'UPLOAD_ERROR', message } });
     return;
   }
 

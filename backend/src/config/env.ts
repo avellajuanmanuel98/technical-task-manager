@@ -7,6 +7,9 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('8h'),
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // Offset de la zona horaria del negocio en minutos respecto a UTC (ej. Colombia = -300).
+  // Se usa solo al importar horas "naive" desde Excel para convertirlas a UTC correctamente.
+  IMPORT_TZ_OFFSET_MINUTES: z.coerce.number().default(-300),
 });
 
 const parsed = envSchema.safeParse(process.env);

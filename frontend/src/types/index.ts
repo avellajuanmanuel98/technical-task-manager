@@ -94,3 +94,50 @@ export interface DashboardFilters {
   dateFrom?: string
   dateTo?: string
 }
+
+export type ImportRowStatus = 'valid' | 'duplicate' | 'error'
+
+export interface ImportPreviewRow {
+  rowNumber: number
+  externalRef: string | null
+  description: string | null
+  technicianRaw: string | null
+  technicianId: string | null
+  laborRaw: string | null
+  laborTypeId: string | null
+  scheduledDate: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  status: TaskStatus
+  observations: string | null
+  totalMinutes: number | null
+  rowStatus: ImportRowStatus
+  errors: string[]
+}
+
+export interface ImportPreviewResult {
+  totalRows: number
+  summary: { valid: number; duplicate: number; error: number }
+  technicians: UserRef[]
+  laborTypes: { id: string; name: string }[]
+  rows: ImportPreviewRow[]
+}
+
+export interface ImportConfirmRow {
+  rowNumber: number
+  description: string
+  technicianId: string
+  laborTypeId: string
+  scheduledDate: string
+  startedAt: string | null
+  finishedAt: string | null
+  status: TaskStatus
+  observations: string | null
+  externalRef: string | null
+}
+
+export interface ImportConfirmResult {
+  imported: number
+  skippedDuplicates: number
+  errors: { rowNumber: number; message: string }[]
+}
