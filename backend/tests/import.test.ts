@@ -49,14 +49,58 @@ describe('import de Excel', () => {
     expect(res.status).toBe(403);
   });
 
-  it('rechaza un archivo sin las columnas requeridas', async () => {
+  it('rechaza un archivo sin las columnas de técnico/labor', async () => {
     const buffer = await buildWorkbookBuffer(['Descripción'], [['solo descripción']]);
     const res = await request(app)
       .post('/api/import/preview')
       .set('Authorization', `Bearer ${adminToken}`)
       .attach('file', buffer, 'malo.xlsx');
     expect(res.status).toBe(400);
-    expect(res.body.error.message).toMatch(/columnas requeridas/i);
+    expect(res.body.error.message).toMatch(/técnico y\/o labor/i);
+  });
+
+  it('rechaza un archivo sin columna de fecha si no se indica una fecha por defecto', async () => {
+    const buffer = await buildWorkbookBuffer(
+      ['ID DE TAREA', 'TECNICO', 'LABOR', 'HORA INICIO', 'HORA FIN'],
+      [['Tarea #1: Algo', 'David Yesid Martinez', 'Configuración de equipo', '10:00 AM', '10:10 AM']],
+    );
+    const res = await request(app)
+      .post('/api/import/preview')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', buffer, 'sin-fecha.xlsx');
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/no tiene columna de fecha/i);
+  });
+
+  it('importa el formato original (ID de tarea combinado, sin columna de fecha) usando una fecha por defecto', async () => {
+    const buffer = await buildWorkbookBuffer(
+      ['ID DE TAREA', 'TECNICO', 'LABOR', 'HORA INICIO', 'HORA FIN', 'TOTAL TIEMPO', 'CALIFICACION FINAL'],
+      [
+        [
+          'Tarea #4859: Computador no enciende',
+          'David Yesid Martinez',
+          'Configuración de equipo',
+          '10:06 AM',
+          '10:20 AM',
+          '14 minutos',
+          'Pendiente',
+        ],
+      ],
+    );
+    const res = await request(app)
+      .post('/api/import/preview')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .field('defaultDate', '2026-09-03')
+      .attach('file', buffer, 'historico.xlsx');
+
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toEqual({ valid: 1, duplicate: 0, error: 0 });
+    const row = res.body.rows[0];
+    expect(row.externalRef).toBe('Tarea #4859');
+    expect(row.description).toBe('Computador no enciende');
+    expect(row.scheduledDate).toBe('2026-09-03T05:00:00.000Z'); // medianoche local (UTC-5) convertida a UTC
+    expect(row.totalMinutes).toBe(14); // recalculado en backend, ignora la columna "TOTAL TIEMPO"
+    expect(row.status).toBe('FINALIZADA');
   });
 
   it('valida, calcula tiempo con zona horaria, detecta cruce de medianoche y duplicados', async () => {

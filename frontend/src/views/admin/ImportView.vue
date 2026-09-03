@@ -19,6 +19,9 @@ const uploadError = ref('')
 
 const preview = ref<ImportPreviewResult | null>(null)
 const summaryResult = ref<ImportConfirmResult | null>(null)
+const selectedFile = ref<File | null>(null)
+const defaultDate = ref('')
+const needsDefaultDate = ref(false)
 
 // Estado editable por fila: si se incluye en la importación, y correcciones
 // manuales de técnico/labor cuando el archivo trae un valor no reconocido.
@@ -31,6 +34,8 @@ function resetWizard() {
   preview.value = null
   summaryResult.value = null
   uploadError.value = ''
+  selectedFile.value = null
+  needsDefaultDate.value = false
   Object.keys(rowState).forEach((k) => delete rowState[Number(k)])
 }
 
@@ -39,10 +44,12 @@ async function handleFile(file: File) {
     toast.error('Solo se admiten archivos .xlsx')
     return
   }
+  selectedFile.value = file
   uploading.value = true
   uploadError.value = ''
   try {
-    const result = await importApi.previewImport(file)
+    const result = await importApi.previewImport(file, defaultDate.value || undefined)
+    needsDefaultDate.value = false
     preview.value = result
     for (const row of result.rows) {
       rowState[row.rowNumber] = {
@@ -53,7 +60,9 @@ async function handleFile(file: File) {
     }
     step.value = 'review'
   } catch (err) {
-    uploadError.value = extractErrorMessage(err)
+    const message = extractErrorMessage(err)
+    uploadError.value = message
+    needsDefaultDate.value = /columna de fecha/i.test(message)
   } finally {
     uploading.value = false
   }
@@ -62,6 +71,10 @@ async function handleFile(file: File) {
 function onFileInput(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (file) handleFile(file)
+}
+
+function retryWithDefaultDate() {
+  if (selectedFile.value) handleFile(selectedFile.value)
 }
 
 function onDrop(e: DragEvent) {
@@ -163,7 +176,27 @@ async function handleConfirm() {
           </span>
           <input type="file" accept=".xlsx" class="hidden" :disabled="uploading" @change="onFileInput" />
         </label>
-        <p v-if="uploadError" class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{{ uploadError }}</p>
+        <div v-if="uploadError" class="mt-4 w-full max-w-md rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+          <p>{{ uploadError }}</p>
+          <div v-if="needsDefaultDate" class="mt-3 flex items-center justify-center gap-2">
+            <input v-model="defaultDate" type="date" class="field-input bg-white" />
+            <AppButton size="sm" :disabled="!defaultDate" :loading="uploading" @click="retryWithDefaultDate">
+              Reintentar
+            </AppButton>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 rounded-lg bg-gray-50 px-4 py-3 text-sm">
+        <label class="mb-2 block font-medium text-[var(--color-text)]">
+          Fecha por defecto <span class="font-normal text-[var(--color-text-muted)]">(opcional)</span>
+        </label>
+        <div class="flex items-center gap-2">
+          <input v-model="defaultDate" type="date" class="field-input max-w-[180px]" />
+          <p class="text-xs text-[var(--color-text-muted)]">
+            Se aplica solo a filas sin fecha propia — útil si tu archivo (como el proceso original) no registra fecha.
+          </p>
+        </div>
       </div>
 
       <div class="mt-4 flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3 text-sm">

@@ -1,9 +1,10 @@
 import { apiClient } from './client'
 import type { ImportConfirmResult, ImportConfirmRow, ImportPreviewResult } from '../types'
 
-export function previewImport(file: File) {
+export function previewImport(file: File, defaultDate?: string) {
   const form = new FormData()
   form.append('file', file)
+  if (defaultDate) form.append('defaultDate', defaultDate)
   return apiClient.post<ImportPreviewResult>('/import/preview', form).then((r) => r.data)
 }
 

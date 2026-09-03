@@ -36,7 +36,11 @@ const HEADER_ALIASES: Record<string, string[]> = {
   observations: ['observaciones', 'notas', 'comentarios'],
 };
 
-const REQUIRED_FIELDS = ['description', 'technicianRaw', 'laborRaw', 'dateRaw'] as const;
+// Técnico y Labor son estructuralmente indispensables. Descripción y Fecha
+// se resuelven de forma más flexible (ver parseWorkbook): un archivo del
+// proceso original (columna única "ID DE TAREA: descripción", sin columna
+// de Fecha) debe poder importarse sin obligar a reformatear el Excel.
+const HARD_REQUIRED_FIELDS = ['technicianRaw', 'laborRaw'] as const;
 
 const STATUS_ALIASES: Record<string, TaskStatus> = {
   pendiente: TaskStatus.PENDIENTE,
@@ -104,7 +108,13 @@ function localToUtcIso(y: number, m: number, d: number, h = 0, min = 0): string 
   return new Date(trueUtcMs).toISOString();
 }
 
-export async function parseWorkbook(buffer: Buffer): Promise<ParsedRow[]> {
+export interface ParseOptions {
+  // Fecha (yyyy-mm-dd) a aplicar en filas sin columna/valor de fecha propio.
+  // Necesario para archivos del proceso original, que no registran fecha.
+  defaultDate?: string;
+}
+
+export async function parseWorkbook(buffer: Buffer, options: ParseOptions = {}): Promise<ParsedRow[]> {
   const workbook = new ExcelJS.Workbook();
   try {
     // Cast puntual: @types/node hizo `Buffer` genérico y los tipos de exceljs
@@ -129,12 +139,28 @@ export async function parseWorkbook(buffer: Buffer): Promise<ParsedRow[]> {
     }
   });
 
-  const missing = REQUIRED_FIELDS.filter((f) => columnIndex[f] === undefined);
+  const missing = HARD_REQUIRED_FIELDS.filter((f) => columnIndex[f] === undefined);
   if (missing.length > 0) {
+    throw new ImportFileError(`No se encontraron las columnas de Técnico y/o Labor. Faltan: ${missing.join(', ')}`);
+  }
+  if (columnIndex.description === undefined && columnIndex.externalRef === undefined) {
     throw new ImportFileError(
-      `No se encontraron todas las columnas requeridas (Descripción, Técnico, Labor, Fecha). Faltan: ${missing.join(', ')}`,
+      'No se encontró una columna de Descripción ni de "ID de tarea" (se necesita al menos una de las dos)',
     );
   }
+
+  const defaultDateParts = options.defaultDate ? cellToDateOnly(options.defaultDate) : null;
+  if (columnIndex.dateRaw === undefined && !defaultDateParts) {
+    throw new ImportFileError(
+      'El archivo no tiene columna de Fecha. Indica una fecha por defecto en el asistente para poder importarlo',
+    );
+  }
+
+  // Solo se deriva la descripción desde "ID de tarea" cuando el archivo no
+  // trae una columna de Descripción propia. Si la columna existe pero una
+  // celda puntual viene vacía, es un dato faltante real, no un formato
+  // distinto — debe marcarse como error, no inventarse un valor.
+  const hasDescriptionColumn = columnIndex.description !== undefined;
 
   const rows: ParsedRow[] = [];
 
@@ -146,19 +172,34 @@ export async function parseWorkbook(buffer: Buffer): Promise<ParsedRow[]> {
       return idx ? row.getCell(idx).value : null;
     };
 
-    const description = cellToString(cell('description'));
+    let description = cellToString(cell('description'));
     const technicianRaw = cellToString(cell('technicianRaw'));
     const laborRaw = cellToString(cell('laborRaw'));
-    const externalRef = cellToString(cell('externalRef'));
+    let externalRef = cellToString(cell('externalRef'));
     const observations = cellToString(cell('observations'));
     const statusRawCell = cellToString(cell('statusRaw'));
 
     // Fila completamente vacía (Excel a veces deja filas en blanco al final): se ignora.
     if (!description && !technicianRaw && !laborRaw && !externalRef) return;
 
+    // Formato original: una sola columna "ID DE TAREA" con valores como
+    // "Tarea #4859: Computador no enciende". Si no hay columna de
+    // Descripción propia, se separa por el primer ":" — antes queda como
+    // referencia externa, después como descripción.
+    if (!hasDescriptionColumn && !description && externalRef) {
+      const sep = externalRef.indexOf(':');
+      if (sep !== -1 && externalRef.slice(sep + 1).trim()) {
+        description = externalRef.slice(sep + 1).trim();
+        externalRef = externalRef.slice(0, sep).trim() || null;
+      } else {
+        description = externalRef;
+        externalRef = null;
+      }
+    }
+
     const parseErrors: string[] = [];
 
-    const dateParts = cellToDateOnly(cell('dateRaw'));
+    const dateParts = cellToDateOnly(cell('dateRaw')) ?? defaultDateParts;
     const startParts = cellToTimeOfDay(cell('startTimeRaw'));
     const endParts = cellToTimeOfDay(cell('endTimeRaw'));
 

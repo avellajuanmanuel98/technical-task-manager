@@ -1,6 +1,6 @@
 import { Role, TaskSource, TaskStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
-import { parseWorkbook, ImportFileError } from './import.parser';
+import { parseWorkbook, ImportFileError, type ParseOptions } from './import.parser';
 import type { ConfirmRowInput } from './import.validation';
 
 export { ImportFileError };
@@ -41,8 +41,8 @@ function duplicateKey(technicianId: string, scheduledDateIso: string, descriptio
   return `${technicianId}|${scheduledDateIso.slice(0, 10)}|${normalizeText(description)}`;
 }
 
-export async function previewImport(buffer: Buffer): Promise<PreviewResult> {
-  const parsedRows = await parseWorkbook(buffer);
+export async function previewImport(buffer: Buffer, options: ParseOptions = {}): Promise<PreviewResult> {
+  const parsedRows = await parseWorkbook(buffer, options);
 
   const [technicians, laborTypes] = await Promise.all([
     prisma.user.findMany({ where: { role: Role.TECNICO, active: true }, select: { id: true, name: true, email: true } }),

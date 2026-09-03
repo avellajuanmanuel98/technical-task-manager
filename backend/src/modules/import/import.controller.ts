@@ -1,14 +1,20 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { ValidationError } from '../../lib/errors';
 import * as importService from './import.service';
 import { buildTemplateBuffer } from './import.template';
 import { confirmImportSchema } from './import.validation';
 
+const previewOptionsSchema = z.object({
+  defaultDate: z.string().trim().min(1).optional(),
+});
+
 export async function preview(req: Request, res: Response) {
   if (!req.file) {
     throw new ValidationError('Debe adjuntar un archivo (.xlsx)');
   }
-  const result = await importService.previewImport(req.file.buffer);
+  const options = previewOptionsSchema.parse(req.body ?? {});
+  const result = await importService.previewImport(req.file.buffer, options);
   res.json(result);
 }
 
