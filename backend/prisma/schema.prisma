@@ -1,0 +1,103 @@
+// Prisma schema — Technical Task Manager (MVP)
+// Modelo deliberadamente simple: 3 entidades núcleo (User, LaborType, Task).
+// Extensiones previstas para fase 2 (ratings, task_time_events, task_history,
+// import_batches) se agregan como tablas nuevas sin romper este esquema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TECNICO
+}
+
+enum TaskStatus {
+  PENDIENTE
+  EN_PROGRESO
+  FINALIZADA
+  CANCELADA
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tasksAssigned    Task[] @relation("TaskTechnician")
+  tasksCreated     Task[] @relation("TaskCreatedBy")
+  tasksStarted     Task[] @relation("TaskStartedBy")
+  tasksFinished    Task[] @relation("TaskFinishedBy")
+  tasksCancelled   Task[] @relation("TaskCancelledBy")
+
+  @@map("users")
+}
+
+model LaborType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks Task[]
+
+  @@map("labor_types")
+}
+
+model Task {
+  // Id numérico secuencial: permite un código humano legible (TASK-0001)
+  // sin necesidad de una columna adicional ni de una transacción extra.
+  id          Int        @id @default(autoincrement())
+  description String
+  status      TaskStatus @default(PENDIENTE)
+
+  technicianId String
+  technician   User   @relation("TaskTechnician", fields: [technicianId], references: [id])
+
+  laborTypeId String
+  laborType   LaborType @relation(fields: [laborTypeId], references: [id])
+
+  scheduledDate DateTime
+
+  startedAt   DateTime?
+  startedById String?
+  startedBy   User?     @relation("TaskStartedBy", fields: [startedById], references: [id])
+
+  finishedAt   DateTime?
+  finishedById String?
+  finishedBy   User?     @relation("TaskFinishedBy", fields: [finishedById], references: [id])
+
+  // Derivado en backend al finalizar; nunca aceptado desde el cliente.
+  totalMinutes Int?
+
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("TaskCancelledBy", fields: [cancelledById], references: [id])
+  cancelReason  String?
+
+  observations String?
+
+  createdById String
+  createdBy   User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([technicianId])
+  @@index([status])
+  @@index([laborTypeId])
+  @@index([scheduledDate])
+  @@map("tasks")
+}
