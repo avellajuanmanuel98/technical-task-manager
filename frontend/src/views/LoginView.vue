@@ -20,7 +20,7 @@ async function handleSubmit() {
   loading.value = true
   try {
     await auth.login(email.value, password.value)
-    const redirect = (route.query.redirect as string) || (auth.isAdmin ? '/tasks' : '/my-tasks')
+    const redirect = (route.query.redirect as string) || (auth.isAdmin ? '/dashboard' : '/my-tasks')
     router.push(redirect)
   } catch (err) {
     error.value = extractErrorMessage(err)

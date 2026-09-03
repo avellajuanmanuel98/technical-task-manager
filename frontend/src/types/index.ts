@@ -74,3 +74,23 @@ export interface ApiError {
     details?: unknown
   }
 }
+
+export interface DashboardStats {
+  totals: {
+    total: number
+    pendiente: number
+    enProgreso: number
+    finalizada: number
+    cancelada: number
+  }
+  avgAttentionMinutes: number | null
+  totalWorkedMinutes: number
+  byTechnician: { technicianId: string; technicianName: string; count: number; avgMinutes: number | null }[]
+  byLaborType: { laborTypeId: string; laborTypeName: string; count: number }[]
+  byDay: { date: string; count: number }[]
+}
+
+export interface DashboardFilters {
+  dateFrom?: string
+  dateTo?: string
+}

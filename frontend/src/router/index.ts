@@ -14,8 +14,14 @@ const router = createRouter({
       path: '/',
       redirect: () => {
         const auth = useAuthStore()
-        return auth.isAdmin ? '/tasks' : '/my-tasks'
+        return auth.isAdmin ? '/dashboard' : '/my-tasks'
       },
+    },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('../views/DashboardView.vue'),
+      meta: { roles: ['ADMIN'] },
     },
     {
       path: '/tasks',
@@ -59,7 +65,7 @@ router.beforeEach((to) => {
 
   if (to.meta.public) {
     if (to.name === 'login' && auth.isAuthenticated) {
-      return auth.isAdmin ? '/tasks' : '/my-tasks'
+      return auth.isAdmin ? '/dashboard' : '/my-tasks'
     }
     return true
   }
@@ -70,7 +76,7 @@ router.beforeEach((to) => {
 
   const allowedRoles = to.meta.roles as string[] | undefined
   if (allowedRoles && !allowedRoles.includes(auth.user?.role ?? '')) {
-    return auth.isAdmin ? '/tasks' : '/my-tasks'
+    return auth.isAdmin ? '/dashboard' : '/my-tasks'
   }
 
   return true

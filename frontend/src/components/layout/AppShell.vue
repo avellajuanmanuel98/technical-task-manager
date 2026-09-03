@@ -12,6 +12,7 @@ function handleLogout() {
 }
 
 const adminNav = [
+  { to: '/dashboard', label: 'Dashboard', icon: '📊' },
   { to: '/tasks', label: 'Tareas', icon: '📋' },
   { to: '/admin/technicians', label: 'Técnicos', icon: '👤' },
   { to: '/admin/labor-types', label: 'Tipos de labor', icon: '🏷️' },
