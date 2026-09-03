@@ -11,8 +11,7 @@
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "tsx prisma/seed.ts",
-    "lint": "eslint . --ext .ts"
+    "prisma:seed": "tsx prisma/seed.ts"
   },
   "keywords": [],
   "author": "",
