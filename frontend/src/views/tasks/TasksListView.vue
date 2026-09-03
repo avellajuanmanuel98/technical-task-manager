@@ -44,6 +44,8 @@ const showCreateModal = ref(false)
 const editingTask = ref<Task | null>(null)
 const cancellingTask = ref<Task | null>(null)
 const cancelLoading = ref(false)
+const showExportMenu = ref(false)
+const exporting = ref(false)
 
 let searchDebounce: ReturnType<typeof setTimeout> | undefined
 
@@ -115,6 +117,32 @@ async function confirmCancel(reason: string) {
   }
 }
 
+async function handleExport(format: 'xlsx' | 'csv') {
+  showExportMenu.value = false
+  exporting.value = true
+  try {
+    const { blob, filename } = await tasksApi.exportTasks({
+      technicianId: filters.technicianId,
+      status: filters.status,
+      laborTypeId: filters.laborTypeId,
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+      search: filters.search,
+      format,
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    toast.error(extractErrorMessage(err))
+  } finally {
+    exporting.value = false
+  }
+}
+
 onMounted(() => {
   loadCatalogs()
   fetchTasks()
@@ -130,7 +158,26 @@ watch(() => [filters.technicianId, filters.status, filters.laborTypeId, filters.
         <h1 class="text-2xl font-semibold text-[var(--color-text)]">Tareas</h1>
         <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ meta.total }} tareas registradas</p>
       </div>
-      <AppButton @click="showCreateModal = true">+ Nueva tarea</AppButton>
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <AppButton variant="secondary" :loading="exporting" @click="showExportMenu = !showExportMenu">
+            Exportar
+          </AppButton>
+          <div
+            v-if="showExportMenu"
+            class="absolute right-0 z-10 mt-1 w-40 overflow-hidden rounded-lg border border-[var(--color-border)] bg-white shadow-lg"
+            @click.stop
+          >
+            <button type="button" class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50" @click="handleExport('xlsx')">
+              Excel (.xlsx)
+            </button>
+            <button type="button" class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50" @click="handleExport('csv')">
+              CSV
+            </button>
+          </div>
+        </div>
+        <AppButton @click="showCreateModal = true">+ Nueva tarea</AppButton>
+      </div>
     </div>
 
     <!-- Filtros -->

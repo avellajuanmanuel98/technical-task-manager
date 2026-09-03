@@ -42,6 +42,21 @@ export const listTasksQuerySchema = z.object({
   sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
 
+// Mismos filtros que el listado (sin paginación): la exportación debe
+// respetar exactamente lo que el coordinador está viendo en la tabla.
+export const exportTasksQuerySchema = z.object({
+  technicianId: z.string().optional(),
+  status: taskStatusEnum.optional(),
+  laborTypeId: z.string().optional(),
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
+  search: z.string().trim().max(200).optional(),
+  sortBy: z.enum(['scheduledDate', 'createdAt', 'status', 'totalMinutes']).default('scheduledDate'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+  format: z.enum(['xlsx', 'csv']).default('xlsx'),
+});
+
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
+export type ExportTasksQuery = z.infer<typeof exportTasksQuerySchema>;

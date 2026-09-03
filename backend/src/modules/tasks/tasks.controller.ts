@@ -2,9 +2,11 @@ import type { Request, Response } from 'express';
 import { paramValue } from '../../lib/params';
 import { ValidationError } from '../../lib/errors';
 import * as tasksService from './tasks.service';
+import { buildTasksCsv, buildTasksXlsx } from './tasks.export';
 import {
   cancelTaskSchema,
   createTaskSchema,
+  exportTasksQuerySchema,
   finishTaskSchema,
   listTasksQuerySchema,
   updateTaskSchema,
@@ -28,6 +30,24 @@ export async function list(req: Request, res: Response) {
   const query = listTasksQuerySchema.parse(req.query);
   const result = await tasksService.listTasks(req.user!, query);
   res.json(result);
+}
+
+export async function exportTasks(req: Request, res: Response) {
+  const query = exportTasksQuerySchema.parse(req.query);
+  const tasks = await tasksService.getTasksForExport(req.user!, query);
+
+  const timestamp = new Date().toISOString().slice(0, 10);
+  if (query.format === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="tareas-${timestamp}.csv"`);
+    res.send(buildTasksCsv(tasks));
+    return;
+  }
+
+  const buffer = await buildTasksXlsx(tasks);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="tareas-${timestamp}.xlsx"`);
+  res.send(buffer);
 }
 
 export async function getById(req: Request, res: Response) {

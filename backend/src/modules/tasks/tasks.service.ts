@@ -2,7 +2,7 @@ import { Prisma, Role, TaskStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors';
 import { canTransition } from './task.state-machine';
-import type { CreateTaskInput, ListTasksQuery, UpdateTaskInput } from './tasks.validation';
+import type { CreateTaskInput, ExportTasksQuery, ListTasksQuery, UpdateTaskInput } from './tasks.validation';
 
 interface Actor {
   id: string;
@@ -51,31 +51,47 @@ export async function createTask(actor: Actor, input: CreateTaskInput) {
   });
 }
 
-export async function listTasks(actor: Actor, query: ListTasksQuery) {
+interface TaskFilterFields {
+  technicianId?: string;
+  status?: TaskStatus;
+  laborTypeId?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+}
+
+// Compartido entre el listado paginado y la exportación: ambos deben
+// aplicar exactamente los mismos filtros (incluida la restricción de
+// visibilidad del técnico) para que "exportar lo que veo" sea literal.
+function buildTaskWhere(actor: Actor, filters: TaskFilterFields): Prisma.TaskWhereInput {
   const where: Prisma.TaskWhereInput = {};
 
-  // Un técnico solo puede ver sus propias tareas, sin importar lo que pida
-  // el query param: la restricción se aplica siempre en backend.
   if (actor.role === Role.TECNICO) {
     where.technicianId = actor.id;
-  } else if (query.technicianId) {
-    where.technicianId = query.technicianId;
+  } else if (filters.technicianId) {
+    where.technicianId = filters.technicianId;
   }
 
-  if (query.status) where.status = query.status;
-  if (query.laborTypeId) where.laborTypeId = query.laborTypeId;
-  if (query.dateFrom || query.dateTo) {
+  if (filters.status) where.status = filters.status;
+  if (filters.laborTypeId) where.laborTypeId = filters.laborTypeId;
+  if (filters.dateFrom || filters.dateTo) {
     where.scheduledDate = {
-      ...(query.dateFrom ? { gte: query.dateFrom } : {}),
-      ...(query.dateTo ? { lte: query.dateTo } : {}),
+      ...(filters.dateFrom ? { gte: filters.dateFrom } : {}),
+      ...(filters.dateTo ? { lte: filters.dateTo } : {}),
     };
   }
-  if (query.search) {
+  if (filters.search) {
     where.OR = [
-      { description: { contains: query.search, mode: 'insensitive' } },
-      { technician: { name: { contains: query.search, mode: 'insensitive' } } },
+      { description: { contains: filters.search, mode: 'insensitive' } },
+      { technician: { name: { contains: filters.search, mode: 'insensitive' } } },
     ];
   }
+
+  return where;
+}
+
+export async function listTasks(actor: Actor, query: ListTasksQuery) {
+  const where = buildTaskWhere(actor, query);
 
   const [data, total] = await Promise.all([
     prisma.task.findMany({
@@ -97,6 +113,19 @@ export async function listTasks(actor: Actor, query: ListTasksQuery) {
       totalPages: Math.ceil(total / query.pageSize) || 1,
     },
   };
+}
+
+const EXPORT_MAX_ROWS = 20000;
+
+export async function getTasksForExport(actor: Actor, query: ExportTasksQuery) {
+  const where = buildTaskWhere(actor, query);
+
+  return prisma.task.findMany({
+    where,
+    include: taskInclude,
+    orderBy: { [query.sortBy]: query.sortDir },
+    take: EXPORT_MAX_ROWS,
+  });
 }
 
 export async function getTaskById(actor: Actor, id: number) {

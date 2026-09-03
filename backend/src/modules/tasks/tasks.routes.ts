@@ -9,6 +9,7 @@ export const tasksRouter = Router();
 tasksRouter.use(authenticate);
 
 tasksRouter.get('/', asyncHandler(tasksController.list));
+tasksRouter.get('/export', requireRole(Role.ADMIN), asyncHandler(tasksController.exportTasks));
 tasksRouter.get('/:id', asyncHandler(tasksController.getById));
 tasksRouter.post('/', requireRole(Role.ADMIN), asyncHandler(tasksController.create));
 tasksRouter.put('/:id', requireRole(Role.ADMIN), asyncHandler(tasksController.update));
